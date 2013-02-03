@@ -19,14 +19,138 @@ from sklearn.svm import SVC, SVR, LinearSVC, NuSVC
 from sklearn.grid_search import GridSearchCV
 from sklearn.metrics import zero_one
 
-start = datetime.now()
-"""
-train on the first 250 items in the target_practice column
-then score based upon the remaining ~20k items
-"""
+
+class DataLoader():
+
+    def __init__(self):
+        pass
+
+    def load_users(self, users_file):
+        csvfile = csv.reader(open(users_file, 'rU'))
+        header = csvfile.next()
+        self.users = {}
+        for row in csvfile:
+            # locale
+            # birthyear
+            try:
+              birthyear = int(row[2])
+            except:
+              birthyear = None
+            # age
+            age = 2013 - int(row[2]) if birthyear else None
+            # gender
+            male = True if row[3] == "male" else False
+            # joined
+            # user age
+            try:
+                user_age = (datetime.now() - datetime.strptime(row[4],
+                                            "%Y-%m-%dT%H:%M:%S.%fZ")).days
+            except:
+                user_age = None
+            # location
+            # timezone
+            timezone = int(row[6]) if row[6] else None
+            self.users[row[0]] = {'locale': row[1], 'birthyear': birthyear,
+                                  'age': age, 'gender': male, 'joined': row[4],
+                                  'user_age': user_age, 'location': row[5],
+                                  'timezone': timezone}
 
 
-def wmae(y_true, y_pred, weights):
+    def load_events(self, events_file):
+        csvfile = csv.reader(open(events_file, 'rU'))
+        header = csvfile.next()
+        self.events = {}
+        for row in csvfile:
+            set_of_events = row[0].split(" ")
+            for each in set_of_events:
+                yes_attendees = row[1].split(" ")
+                maybe_attendees = row[2].split(" ")
+                invited_attendees = row[3].split(" ")
+                no_attendees = row[4].split(" ")
+                self.events[each] = {'yes': yes_attendees,
+                                     'maybe': maybe_attendees,
+                                     'invited': invited_attendees,
+                                     'no': no_attendees}
+
+    def load_interests(self, interests_file):
+        csvfile = csv.reader(open(interests_file, 'rU'))
+        header = csvfile.next()
+        self.interests = []
+        for row in csvfile:
+            # user
+            # event
+            # invited
+            invited = True if row[2] == 1 else False
+            # timestamp
+            try:
+                timestamp = datetime.strptime(row[3].replace("+00:00",""),
+                                          "%Y-%m-%d %H:%M:%S.%f")
+            except:
+                try:
+                    timestamp = datetime.strptime(row[3].replace("+00:00",""),
+                                              "%Y-%m-%d %H:%M:%S")
+                except:
+                    timestamp = None
+            # interested
+            interested = True if row[2] == 1 else False
+            # not_interested
+            not_interested = True if row[2] == 1 else False
+            self.interests.append([row[0], row[1], invited, timestamp,
+                                  interested, not_interested])
+
+    def consolidate_data(self, output_file):
+        with open(output_file, 'wb') as csvfile:
+            csvwriter = csv.writer(csvfile, delimiter=',')
+            for each in self.interests:
+                user_info = self.users[each[0]]
+                each.append(user_info['locale'])
+                each.append(user_info['birthyear'])
+                each.append(user_info['age'])
+                each.append(user_info['gender'])
+                each.append(user_info['joined'])
+                each.append(user_info['user_age'])
+                each.append(user_info['location'])
+                each.append(user_info['timezone'])
+
+                event_info = self.events[each[1]]
+                each.append(True) if each[0] in event_info['yes'] \
+                else each.append(False)
+                each.append(True) if each[0] in event_info['maybe'] \
+                else each.append(False)
+                each.append(True) if each[0] in event_info['invited'] \
+                else each.append(False)
+                each.append(True) if each[0] in event_info['no'] \
+                else each.append(False)
+
+                csvwriter.writerow(each)
+
+    def load_user_data(self, output_file, interests_file, user_file,
+                       attendees_file):
+
+        self.load_users(user_file)
+        self.load_events(attendees_file)
+        self.load_interests(interests_file)
+        self.consolidate_data(output_file)
+
+
+if __name__ == '__main__':
+
+    USER_FILE = 'data/users.csv'
+    USER_INTERESTS_FILE = 'data/train.csv'
+    ATTENDEES_FILE = 'data/event_attendees.csv'
+    EVENTS_FILE = 'data/events.csv'
+    FRIENDS_FILE = 'data/user_friends.csv'
+    USER_ACTIONS_FILE = 'data/compilations/user_actions.csv'
+
+    start = datetime.now()
+    dl = DataLoader()
+    dl.load_user_data(USER_ACTIONS_FILE, USER_INTERESTS_FILE, USER_FILE,
+                      ATTENDEES_FILE)
+    stop = datetime.now()
+
+    print "run time: " + str(stop - start)
+
+"""def wmae(y_true, y_pred, weights):
     y_true, y_pred = check_arrays(y_true, y_pred)
     return (1 / np.sum(weights)) * (np.sum(weights * (y_pred - y_true)))
 
@@ -61,7 +185,7 @@ def convert_currency(row, items=[]):
 
 def dual_cross_val_score(estimator1, estimator2, X, y, score_func,
                          train, test, verbose, ratio):
-    """Inner loop for cross validation"""
+    "Inner loop for cross validation"
 
     estimator1.fit(X[train], y[train])
     estimator2.fit(X[train], y[train])
@@ -131,4 +255,4 @@ train_x = np.delete(train_data, [0, 1, 2, 3, 4], 1)
 test_data = all_data[cutoff:]
 entries = test_data[0::, 0]
 test_y_practice = test_data[0::, 2]
-test_x = np.delete(test_data, [0, 1, 2, 3, 4], 1)
+test_x = np.delete(test_data, [0, 1, 2, 3, 4], 1)"""
